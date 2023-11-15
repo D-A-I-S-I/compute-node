@@ -11,7 +11,7 @@ services:
     networks: ["brokers"]
     restart: "no"
     environment:
-      - BROKER_URL
+      - BROKER_URL=nats://daisi-broker:4222
 
   broker:
     image: nats

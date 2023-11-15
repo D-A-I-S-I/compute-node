@@ -10,7 +10,6 @@ services:
       - broker
     networks: ["brokers"]
     restart: "no"
-
   broker:
     image: nats
     container_name: daisi-broker

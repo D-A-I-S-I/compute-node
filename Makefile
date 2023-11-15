@@ -1,3 +1,5 @@
+run:
+	docker compose run --build compute
 up:
 	docker compose up -d --build
 down:

@@ -1,16 +1,18 @@
 import asyncio
-import nats
-import os
 import json
-
+import os
 from dataclasses import asdict, dataclass
-from nats.errors import ConnectionClosedError, TimeoutError, NoServersError
+
+import nats
+from nats.errors import ConnectionClosedError, NoServersError, TimeoutError
+
 
 @dataclass
 class Payload:
     id: int
     module: str
     data: str
+
 
 class Compute:
     @classmethod
@@ -23,11 +25,12 @@ class Compute:
 
     async def receive(self):
         sub = await self.nc.subscribe("updates")
-        while(True):
+        while (True):
             async for message in sub.messages:
                 try:
                     payload = Payload(**json.loads(message.data))
-                    print(f"received valid JSON payload: {payload.id=} {payload.module=} {payload.data=}")
+                    print(
+                        f"received valid JSON payload: {payload.id=} {payload.module=} {payload.data=}")
                 except json.decoder.JSONDecodeError:
                     print(f"received invalid JSON payload: {message.data=}")
 
@@ -35,8 +38,6 @@ class Compute:
 async def main():
     compute = await Compute.create()
     await compute.receive()
-
-
 
 
 if __name__ == "__main__":

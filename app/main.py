@@ -1,11 +1,11 @@
 import asyncio
 import nats
+import os
 from nats.errors import ConnectionClosedError, TimeoutError, NoServersError
 
 async def main():
-    # It is very likely that the demo server will see traffic from clients other than yours.
-    # To avoid this, start your own locally and modify the example to use it.
-    nc = await nats.connect("nats://daisi-broker:4222")
+    nats_url = os.getenv("BROKER_URL", "nats://localhost:4222")
+    nc = await nats.connect(nats_url)
 
     # You can also use the following for TLS against the demo server.
     #

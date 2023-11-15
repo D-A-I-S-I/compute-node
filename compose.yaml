@@ -10,6 +10,8 @@ services:
       - broker
     networks: ["brokers"]
     restart: "no"
+    environment:
+      - BROKER_URL
 
   broker:
     image: nats

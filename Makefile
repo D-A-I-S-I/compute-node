@@ -1,6 +1,7 @@
 .PHONY: clean venv
 
 venv: venv/touchfile
+	docker compose up -d broker
 	. venv/bin/activate; python3 app/main.py
 venv/touchfile: app/requirements.txt
 	test -d venv || python -m venv venv
@@ -20,3 +21,4 @@ watch:
 	docker compose watch
 clean:
 	rm -r venv
+	docker compose down --remove-orphans

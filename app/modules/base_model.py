@@ -1,8 +1,15 @@
 from abc import ABC, abstractmethod
 
 class BaseModel(ABC):
-    def __init__(self, model):
-        self.model = model
+    def __init__(self):
+        pass
+
+    @abstractmethod
+    def run(self):
+        """
+        Run the model. Read, Classify, Log, Repeat.
+        """
+        pass
 
     @abstractmethod 
     def load_model(self):

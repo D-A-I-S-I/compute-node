@@ -20,14 +20,14 @@ class BaseModel(ABC):
         pass
 
     @abstractmethod
-    def preprocess_input(self, input_data):
+    def preprocess_input(self):
         """
         Preprocess input data before feeding it to the model.
         """
         pass
 
     @abstractmethod
-    def classify(self, preprocessed_data):
+    def classify(self):
         """
         Perform classification on the preprocessed data.
         """
@@ -41,8 +41,15 @@ class BaseModel(ABC):
         pass
 
     @abstractmethod
-    def calculate_classification_rate(self, classification_results):
+    def write_to_buffer(self, data):
         """
-        Calculate and return the classification rate based on the given results.
+        Write data to buffer.
+        """
+        pass
+
+    @abstractmethod
+    def read_from_buffer(self):
+        """
+        Read data from the file.
         """
         pass

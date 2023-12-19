@@ -1,7 +1,8 @@
 from Autoencoder import Autoencoder
 from ..base_model import BaseModel
-import logging
+from pathlib import Path
 
+import logging
 import torch
 import json
 import yaml
@@ -11,10 +12,13 @@ import csv
 class SyscallModel(BaseModel):
     def __init__(self):
         super().__init__()
-        with open('syscall.conf') as f:
+        script_dir = Path(__file__).parent.absolute()
+
+        with open(script_dir / 'syscall.conf') as f:
             config = yaml.load(f, Loader=yaml.SafeLoader)
-        self.model = self.load_model(config['paths']['model_path'], 
-                                     config['paths']['model_info_path'], 
+            
+        self.model = self.load_model(script_dir / config['paths']['model_path'], 
+                                     script_dir / config['paths']['model_info_path'], 
                                      config['general']['num_system_calls'])
         
         self.syscall_mapping = {i: i for i in range(config['general']['num_system_calls'])}

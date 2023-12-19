@@ -1,5 +1,5 @@
-from Autoencoder import Autoencoder
-from base_model import BaseModel
+from .Autoencoder import Autoencoder
+from ..base_model import BaseModel
 
 import torch
 import json

@@ -1,6 +1,6 @@
 #TODO How/Where to loop until buffer is full
 
-from base_model import BaseModel
+from ..base_model import BaseModel
 import os
 import subprocess
 from joblib import load

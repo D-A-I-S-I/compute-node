@@ -6,7 +6,8 @@ import subprocess
 from joblib import load
 import pandas as pd
 import numpy as np
-import asyncio
+import json
+
 
 class NetworkModel(BaseModel):
     def __init__(self):
@@ -86,6 +87,18 @@ class NetworkModel(BaseModel):
         except subprocess.CalledProcessError as e:
             print(f"Error while converting to flow data: {e}")
             exit
+        
+        #Pre-process CSV file
+        columns = json.load('data_features.json')
+        colsPerTime = columns['colsPerTime']
+        feature_cols = columns['feature_cols']
+        data = pd.read_csv(self.csv_path, delimiter=",")
+
+        for feature in colsPerTime:
+            data[feature + "PerTime"] = data[feature] / data["flowDuration"]
+        data = data[feature_cols]
+
+        data.to_csv("/FlowMeter/pkg/flowOutput/merged_pcap_flow_stats", index=False)
 
 
     def classify(self):
@@ -95,8 +108,8 @@ class NetworkModel(BaseModel):
         data = pd.read_csv(self.csv_path, delimiter=",")
         predictions = self.model.predict(data)
 
-        # Target_class should be whatever benign is labeled ass
-        target_class = 1
+
+        target_class = 1 #1 == Benign
         percentage = np.mean(predictions == target_class) * 100
         print(f"Percentage of class {target_class}: {percentage:.2f}%")
         pass

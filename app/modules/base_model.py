@@ -20,29 +20,22 @@ class BaseModel(ABC):
         pass
 
     @abstractmethod
-    def preprocess_input(self, input_data):
+    def preprocess_input(self):
         """
         Preprocess input data before feeding it to the model.
         """
         pass
 
     @abstractmethod
-    def classify(self, preprocessed_data):
+    def classify(self):
         """
         Perform classification on the preprocessed data.
         """
         pass
 
     @abstractmethod
-    def log_classification(self, classification_result):
+    def log_classification(self):
         """
         Log the classification result.
-        """
-        pass
-
-    @abstractmethod
-    def calculate_classification_rate(self, classification_results):
-        """
-        Calculate and return the classification rate based on the given results.
         """
         pass

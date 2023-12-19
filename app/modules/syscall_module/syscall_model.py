@@ -4,14 +4,16 @@ from ..base_model import BaseModel
 import torch
 import json
 import yaml
+from pathlib import Path
 
 class SyscallModel(BaseModel):
     def __init__(self):
         super().__init__()
-        with open('syscall.conf') as f:
+        script_dir = Path(__file__).parent.absolute()
+        with open(script_dir / 'syscall.conf') as f:
             config = yaml.load(f, Loader=yaml.SafeLoader)
         
-        self.model = self.load_model(config['paths']['model_path'], config['paths']['model_info_path'], config['general']['num_system_calls'])
+        self.model = self.load_model(script_dir / config['paths']['model_path'], script_dir / config['paths']['model_info_path'], config['general']['num_system_calls'])
         self.syscall_mapping = {i: i for i in range(config['general']['num_system_calls'])}
         self.sequence_length = self.model.sequence_length
         self.threshold = config['general']['threshold']
@@ -92,3 +94,14 @@ class SyscallModel(BaseModel):
         average_intrusion_loss_factor = sum(intrusion_losses) / len(intrusion_losses) if intrusion_losses else 0
 
         return sequences_per_second, average_normal_loss_factor, average_intrusion_loss_factor, percentage_intrusions
+
+    def classify(self, preprocessed_data):
+        """
+        Perform classification on the preprocessed data.
+        """
+        pass
+
+    def log_classification(self, classification_result):
+        """
+        Log the classification result.
+        """ pass

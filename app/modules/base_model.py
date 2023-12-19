@@ -39,3 +39,17 @@ class BaseModel(ABC):
         Log the classification result.
         """
         pass
+
+    @abstractmethod
+    def write_to_buffer(self, data):
+        """
+        Write data to buffer.
+        """
+        pass
+
+    @abstractmethod
+    def read_from_buffer(self):
+        """
+        Read data from the file.
+        """
+        pass

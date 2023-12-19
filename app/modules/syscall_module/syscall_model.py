@@ -39,7 +39,7 @@ class SyscallModel(BaseModel):
             batch = []
             while len(self.buffer) < self.batch_size:
                 batch = self.read_from_buffer()
-                asyncio.sleep(0.1) # FIXME adjust the sleep time as needed.
+                await asyncio.sleep(0.1) # FIXME adjust the sleep time as needed.
 
             # Preprocess the data
             preprocessed_batch = self.preprocess_input(batch)
@@ -100,7 +100,8 @@ class SyscallModel(BaseModel):
         Args:
             batch (list): list of system call sequences
         """
-        return [self.preprocess_sequence(sequence) for sequence in batch]
+        tensor_batch = torch.stack(batch)
+        return self.model.embedding(tensor_batch).view(tensor_batch.size(0), -1)
     
     def read_from_buffer(self):
         """
@@ -129,17 +130,17 @@ class SyscallModel(BaseModel):
         else:
             logging.error("Syscall Module: Received empty data.")
 
-    def classify(self, preprocessed_data):
+    def classify(self, preprocessed_batch):
         """
         Classify the preprocessed data.
         """
         # Classify the data
         with torch.no_grad():
-            outputs = self.model(torch.stack(preprocessed_data))
+            outputs = self.model(preprocessed_batch).view(preprocessed_batch.size(0), -1)
 
         # Compute loss
         criterion = torch.nn.MSELoss(reduction='none')
-        losses = criterion(outputs, torch.stack(preprocessed_data)).mean(dim=1)
+        losses = criterion(outputs, preprocessed_batch).mean(dim=1)
 
         # Classify the sequences
         classifications = self.classify(losses)

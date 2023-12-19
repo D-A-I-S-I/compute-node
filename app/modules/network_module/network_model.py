@@ -1,49 +1,71 @@
 #TODO How/Where to loop until buffer is full
 
-from base_model import BaseModel
+from ..base_model import BaseModel
 import os
 import subprocess
+from joblib import load
+import pandas as pd
+import numpy as np
+import json
 
-class SyscallModel(BaseModel):
+
+class NetworkModel(BaseModel):
     def __init__(self):
         super().__init__()
         self.buffer = []
-        self.pcap_path = "PATH TO PCAP FILE (/FlowMeter/pkg/packets/FILENAME)"
-        self.csv_path = "PATH TO CSV FILE  (/FlowMeter/pkg/flowOutput/FILENAME)"
-        self.model = self.load_model(self)
+        #TODO ABSTRACT TO CONFIG FILE
+        self.pcap_path = "/FlowMeter/pkg/packets/merged_pcap"
+        self.csv_path = "/FlowMeter/pkg/flowOutput/merged_pcap_flow_stats"
+        self.model = self.load_model()
 
 
+    async def run(self):
+        while(True):
+            filledBuffer = False
+            while not filledBuffer:
+                filledBuffer = self.read_from_buffer()
+            
+            self.preprocess_input()
+            self.classify()
+            self.log_classification()
+            
+        
     def load_model(self):
         """
         Load the model.
         """
-        pass
+        model = load('trained_model/network_model.joblib')
+        return model
 
 
-    def receive_input(self, outfile):
+    def write_to_buffer(self, data):
+        """
+        Write data to buffer.
+        """
+        self.buffer.append(data)
+
+
+    def read_from_buffer(self):
         """
         Append receieved to buffer and check size of buffer.
         """
-        #TODO check how to store json files in buffer
-        self.buffer.append(outfile)
-
         if len(self.buffer) < 10:
             return False
         
         elif len(self.buffer) > 10:
-            self.buffer.pop
+            self.buffer.pop()
             return True
         
         else:
             return True
 
 
-    def preprocess_input(self, json):
+    def preprocess_input(self):
         """
         Preprocess input data before feeding it to the model.
         """
 
-        mergecap_cmd = ["mergecap", "-w", self.pcap_path] + self.buffer
+        mergecap_cmd = ["mergecap", "-w", self.pcap_path] + self.buffer[:9]
 
         try:
             # Run mergecap_cmd
@@ -54,7 +76,8 @@ class SyscallModel(BaseModel):
             print(f"Error while merging capture files: {e}")
             exit
         
-        flow_cmd = [".PATH_TO_FLOWMETER/flowmeter -ifLiveCapture=false -fname=merged_pcap -maxNumPackets=40000000 -ifLocalIPKnown false"]
+        #TODO ABSTRACT THIS TO CONFIG FILE
+        flow_cmd = [".FlowMeter/pkg/flowmeter -ifLiveCapture=false -fname=merged_pcap -maxNumPackets=40000000 -ifLocalIPKnown false"]
 
         try:
             # Run flow_cmd
@@ -64,14 +87,31 @@ class SyscallModel(BaseModel):
         except subprocess.CalledProcessError as e:
             print(f"Error while converting to flow data: {e}")
             exit
+        
+        #Pre-process CSV file
+        columns = json.load('data_features.json')
+        colsPerTime = columns['colsPerTime']
+        feature_cols = columns['feature_cols']
+        data = pd.read_csv(self.csv_path, delimiter=",")
+
+        for feature in colsPerTime:
+            data[feature + "PerTime"] = data[feature] / data["flowDuration"]
+        data = data[feature_cols]
+
+        data.to_csv("/FlowMeter/pkg/flowOutput/merged_pcap_flow_stats", index=False)
 
 
-
-
-    def classify(self, preprocessed_data):
+    def classify(self):
         """
         Perform classification on the preprocessed data.
         """
+        data = pd.read_csv(self.csv_path, delimiter=",")
+        predictions = self.model.predict(data)
+
+
+        target_class = 1 #1 == Benign
+        percentage = np.mean(predictions == target_class) * 100
+        print(f"Percentage of class {target_class}: {percentage:.2f}%")
         pass
 
 
@@ -79,14 +119,9 @@ class SyscallModel(BaseModel):
         """
         Log the classification result.
         """
+
         pass
 
-
-    def calculate_classification_rate(self, classification_results):
-        """
-        Calculate and return the classification rate based on the given results.
-        """
-        pass
 
 
 

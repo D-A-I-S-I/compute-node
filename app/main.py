@@ -6,6 +6,7 @@ import subprocess
 import nats
 from nats.errors import ConnectionClosedError, NoServersError, TimeoutError
 import shlex
+import modules
 
 @dataclass
 class Payload:

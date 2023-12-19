@@ -34,7 +34,7 @@ class BaseModel(ABC):
         pass
 
     @abstractmethod
-    def log_classification(self, classification_result):
+    def log_classification(self):
         """
         Log the classification result.
         """

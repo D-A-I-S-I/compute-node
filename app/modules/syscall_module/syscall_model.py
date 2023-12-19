@@ -143,7 +143,6 @@ class SyscallModel(BaseModel):
         losses = criterion(outputs, preprocessed_batch).mean(dim=1)
 
         # Classify the sequences
-        classifications = self.classify(losses)
         classifications = ['POSSIBLE INTRUSION' if loss > self.threshold else 'Normal' for loss in losses]
 
         return classifications, losses

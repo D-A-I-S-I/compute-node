@@ -4,3 +4,4 @@ ijson
 scapy
 torch==2.1.2
 PyYAML==6.0.1
+joblib==1.3.2

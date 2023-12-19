@@ -3,6 +3,7 @@ from ..base_model import BaseModel
 from pathlib import Path
 
 import logging
+import asyncio
 import torch
 import json
 import yaml
@@ -35,8 +36,10 @@ class SyscallModel(BaseModel):
         Read, Classify, Log, Repeat.
         """
         while True:
-            # Get input data
-            batch = self.read_from_buffer()
+            batch = []
+            while len(self.buffer) < self.batch_size:
+                batch = self.read_from_buffer()
+                asyncio.sleep(0.1) # FIXME adjust the sleep time as needed.
 
             # Preprocess the data
             preprocessed_batch = self.preprocess_input(batch)

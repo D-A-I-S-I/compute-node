@@ -101,7 +101,8 @@ class SyscallModel(BaseModel):
             batch (list): list of system call sequences
         """
         tensor_batch = [self.preprocess_sequence(sequence) for sequence in batch]
-        return self.model.embedding(torch.stack(tensor_batch)).view(tensor_batch.size(0), -1)
+        tensor_batch_stack = torch.stack(tensor_batch)
+        return self.model.embedding(tensor_batch_stack).view(tensor_batch_stack.size(0), -1)
     
     def read_from_buffer(self):
         """

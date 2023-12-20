@@ -28,8 +28,16 @@ class Compute:
 
     def load_modules(self):
         for module in modules.__all__:
-            c = getattr(modules, module)()
-            self.modules[c.module_name] = c
+            try:
+                c = getattr(modules, module)()
+                if hasattr(c, 'module_name'):
+                    self.modules[c.module_name] = c
+                else:
+                    print(f"Loaded module '{module}' does not have a 'module_name' attribute")
+            except AttributeError as e:
+                print(f"Attribute error loading module '{module}': {e}")
+            except Exception as e:
+                print(f"Error loading module '{module}': {e}")
             print(f"Loaded module: {module}")
 
     def transform(self):

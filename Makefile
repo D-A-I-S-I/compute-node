@@ -7,9 +7,11 @@ venv/touchfile: app/requirements.txt
 	test -d venv || python -m venv venv
 	. venv/bin/activate; pip install -Ur app/requirements.txt
 	touch venv/touchfile
-run-local:
-	. venv/bin/activate; python3 app/main.py
+broker:
+	docker compose up -d --remove-orphans broker
 run:
+	. venv/bin/activate; python3 app/main.py
+docker:
 	docker compose run --remove-orphans --build compute
 up:
 	docker compose up -d --build --remove-orphans

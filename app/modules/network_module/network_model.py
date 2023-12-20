@@ -8,6 +8,7 @@ import numpy as np
 import json
 import asyncio
 
+
 class NetworkModel(BaseModel):
     def __init__(self):
         super().__init__()
@@ -15,6 +16,7 @@ class NetworkModel(BaseModel):
         #TODO ABSTRACT TO CONFIG FILE
         self.pcap_path = "/FlowMeter/pkg/packets/merged_pcap"
         self.csv_path = "/FlowMeter/pkg/flowOutput/merged_pcap_flow_stats"
+        self.json_path = "/FlowMeter/pkg/packets/merged_json"
         self.model = self.load_model()
 
 
@@ -49,10 +51,10 @@ class NetworkModel(BaseModel):
         """
         Append receieved to buffer and check size of buffer.
         """
-        if len(self.buffer) < 10:
+        if len(self.buffer) < 150:
             return False
         
-        elif len(self.buffer) > 10:
+        elif len(self.buffer) > 150:
             self.buffer.pop()
             return True
         
@@ -64,18 +66,34 @@ class NetworkModel(BaseModel):
         """
         Preprocess input data before feeding it to the model.
         """
+        #Merge json files and convert to pcap
+        merged_json = {}
+        for i in range(150):
+            json_file = json.load(self.buffer[i])
+            merged_json.update(json_file)
 
-        mergecap_cmd = ["mergecap", "-w", self.pcap_path] + self.buffer[:10]
+        json.dump(merged_json, self.json_path)
+        
+        jsonToPcap_cmd = ["python3", "json2pcap.py", "-i", self.json_path, "-o", self.pcap_path]
 
         try:
-            # Run mergecap_cmd
-            subprocess.run(mergecap_cmd, check=True)
-            print(f"Merged capture files into {self.pcap_path}")
+            subprocess.run(jsonToPcap_cmd)
         
-        except subprocess.CalledProcessError as e:
-            print(f"Error while merging capture files: {e}")
+        except:
+            print(f"Error while converting json to pcap: {e}")
             exit
+
+        ######DO NOT USE THIS########
+        # mergecap_cmd = ["mergecap", "-w", self.pcap_path] + self.buffer[:150]
+        # try:
+        #     # Run mergecap_cmd
+        #     subprocess.run(mergecap_cmd, check=True)
+        #     print(f"Merged capture files into {self.pcap_path}")
         
+        # except subprocess.CalledProcessError as e:
+        #     print(f"Error while merging capture files: {e}")
+        #     exit
+        ##############################
         #TODO ABSTRACT THIS TO CONFIG FILE
         flow_cmd = [".FlowMeter/pkg/flowmeter -ifLiveCapture=false -fname=merged_pcap -maxNumPackets=40000000 -ifLocalIPKnown false"]
 

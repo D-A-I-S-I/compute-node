@@ -7,20 +7,24 @@ import pandas as pd
 import numpy as np
 import json
 import asyncio
+from pathlib import Path
 
 
 class NetworkModel(BaseModel):
+    module_name = "network_traffic"
     def __init__(self):
         super().__init__()
         self.buffer = []
+        self.script_dir = Path(__file__).parent.absolute()
         #TODO ABSTRACT TO CONFIG FILE
-        self.pcap_path = "/FlowMeter/pkg/packets/merged_pcap"
-        self.csv_path = "/FlowMeter/pkg/flowOutput/merged_pcap_flow_stats"
-        self.json_path = "/FlowMeter/pkg/packets/merged_json"
+        self.pcap_path = self.script_dir / "FlowMeter/pkg/packets/merged_pcap"
+        self.csv_path = self.script_dir / "FlowMeter/pkg/flowOutput/merged_pcap_flow_stats"
+        self.json_path = self.script_dir / "FlowMeter/pkg/packets/merged_json"
         self.model = self.load_model()
 
 
     async def run(self):
+        print("Network Module: Running")
         while(True):
             filledBuffer = False
             while not filledBuffer:
@@ -36,7 +40,7 @@ class NetworkModel(BaseModel):
         """
         Load the model.
         """
-        model = load('trained_model/network_model.joblib')
+        model = load(self.script_dir / 'trained_model/network_model.joblib')
         return model
 
 
@@ -74,7 +78,7 @@ class NetworkModel(BaseModel):
 
         json.dump(merged_json, self.json_path)
         
-        jsonToPcap_cmd = ["python3", "json2pcap.py", "-i", self.json_path, "-o", self.pcap_path]
+        jsonToPcap_cmd = ["python3", self.script_dir / "json2pcap.py", "-i", self.json_path, "-o", self.pcap_path]
 
         try:
             subprocess.run(jsonToPcap_cmd)
@@ -95,7 +99,7 @@ class NetworkModel(BaseModel):
         #     exit
         ##############################
         #TODO ABSTRACT THIS TO CONFIG FILE
-        flow_cmd = [".FlowMeter/pkg/flowmeter -ifLiveCapture=false -fname=merged_pcap -maxNumPackets=40000000 -ifLocalIPKnown false"]
+        flow_cmd = [self.script_dir / "FlowMeter/pkg/flowmeter", "-ifLiveCapture=false", "-fname=merged_pcap", "-maxNumPackets=40000000", "-ifLocalIPKnown", "false"]
 
         try:
             # Run flow_cmd
@@ -107,7 +111,7 @@ class NetworkModel(BaseModel):
             exit
         
         #Pre-process CSV file
-        columns = json.load('data_features.json')
+        columns = json.load(self.script_dir / 'data_features.json')
         colsPerTime = columns['colsPerTime']
         feature_cols = columns['feature_cols']
         data = pd.read_csv(self.csv_path, delimiter=",")
@@ -116,7 +120,7 @@ class NetworkModel(BaseModel):
             data[feature + "PerTime"] = data[feature] / data["flowDuration"]
         data = data[feature_cols]
 
-        data.to_csv("/FlowMeter/pkg/flowOutput/merged_pcap_flow_stats", index=False)
+        data.to_csv(self.script_dir / "FlowMeter/pkg/flowOutput/merged_pcap_flow_stats", index=False)
 
 
     def classify(self):

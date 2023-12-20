@@ -1,13 +1,12 @@
 #TODO How/Where to loop until buffer is full
 
 from ..base_model import BaseModel
-import os
 import subprocess
 from joblib import load
 import pandas as pd
 import numpy as np
 import json
-
+import asyncio
 
 class NetworkModel(BaseModel):
     def __init__(self):
@@ -24,11 +23,12 @@ class NetworkModel(BaseModel):
             filledBuffer = False
             while not filledBuffer:
                 filledBuffer = self.read_from_buffer()
+                await asyncio.sleep(0.1)
             
             self.preprocess_input()
             self.classify()
             self.log_classification()
-            
+            await asyncio.sleep(0)
         
     def load_model(self):
         """
@@ -65,7 +65,7 @@ class NetworkModel(BaseModel):
         Preprocess input data before feeding it to the model.
         """
 
-        mergecap_cmd = ["mergecap", "-w", self.pcap_path] + self.buffer[:9]
+        mergecap_cmd = ["mergecap", "-w", self.pcap_path] + self.buffer[:10]
 
         try:
             # Run mergecap_cmd

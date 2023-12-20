@@ -1,4 +1,4 @@
-from Autoencoder import Autoencoder
+from .Autoencoder import Autoencoder
 from ..base_model import BaseModel
 from pathlib import Path
 
@@ -11,6 +11,7 @@ import time
 import csv
 
 class SyscallModel(BaseModel):
+    module_name = "system_calls"
     def __init__(self):
         super().__init__()
         script_dir = Path(__file__).parent.absolute()
@@ -35,8 +36,9 @@ class SyscallModel(BaseModel):
         Run the model. 
         Read, Classify, Log, Repeat.
         """
+        print("Syscall Module: Running")
+        batch = []
         while True:
-            batch = []
             while len(self.buffer) < self.batch_size:
                 batch = self.read_from_buffer()
                 await asyncio.sleep(0.1) # FIXME adjust the sleep time as needed.
@@ -51,6 +53,8 @@ class SyscallModel(BaseModel):
 
             # Log the classification results
             self.log_classification(losses, classifications, start_time, end_time)
+
+            await asyncio.sleep(0)
 
     def load_model(self, model_path: str, model_info_path: str, num_system_calls: int):
         """
@@ -101,8 +105,7 @@ class SyscallModel(BaseModel):
             batch (list): list of system call sequences
         """
         tensor_batch = [self.preprocess_sequence(sequence) for sequence in batch]
-        tensor_batch_stack = torch.stack(tensor_batch)
-        return self.model.embedding(tensor_batch_stack).view(tensor_batch_stack.size(0), -1)
+        return torch.stack(tensor_batch)
     
     def read_from_buffer(self):
         """
@@ -127,21 +130,23 @@ class SyscallModel(BaseModel):
             data (str): data to be written to buffer
         """
         if data is not None:
-            self.buffer.append(data.split())
+            self.buffer += data.split()
         else:
             logging.error("Syscall Module: Received empty data.")
 
-    def classify(self, preprocessed_batch):
+    def classify(self, tensor_batch):
         """
         Classify the preprocessed data.
         """
         # Classify the data
         with torch.no_grad():
-            outputs = self.model(preprocessed_batch).view(preprocessed_batch.size(0), -1)
+            outputs = self.model(tensor_batch).view(tensor_batch.size(0), -1)
+
+        embedded_batch = self.model.embedding(tensor_batch).view(tensor_batch.size(0), -1)
 
         # Compute loss
         criterion = torch.nn.MSELoss(reduction='none')
-        losses = criterion(outputs, preprocessed_batch).mean(dim=1)
+        losses = criterion(outputs, embedded_batch).mean(dim=1)
 
         # Classify the sequences
         classifications = ['POSSIBLE INTRUSION' if loss > self.threshold else 'Normal' for loss in losses]
@@ -177,5 +182,5 @@ class SyscallModel(BaseModel):
                              average_normal_loss_factor, average_intrusion_loss_factor,
                              self.threshold, percentage_intrusions])
             
-        logging.log(logging.INFO, f"Syscall Module: {num_sequences} sequences classified in {time_taken} seconds. \
+        print(f"Syscall Module: {num_sequences} sequences classified in {time_taken} seconds. \
                     ({sequences_per_second} sequences per second)")

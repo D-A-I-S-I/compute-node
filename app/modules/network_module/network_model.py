@@ -8,7 +8,11 @@ import numpy as np
 import json
 import asyncio
 from pathlib import Path
-
+import time
+import csv
+import os
+import logging
+import yaml
 
 class NetworkModel(BaseModel):
     module_name = "network_traffic"
@@ -16,10 +20,14 @@ class NetworkModel(BaseModel):
         super().__init__()
         self.buffer = []
         self.script_dir = Path(__file__).parent.absolute()
-        #TODO ABSTRACT TO CONFIG FILE
-        self.pcap_path = self.script_dir / "FlowMeter/pkg/packets/merged_pcap"
-        self.csv_path = self.script_dir / "FlowMeter/pkg/flowOutput/merged_pcap_flow_stats"
-        self.json_path = self.script_dir / "FlowMeter/pkg/packets/merged_json"
+
+        with open(self.script_dir / 'network.conf') as f:
+            config = yaml.load(f, Loader=yaml.SafeLoader)
+        self.pcap_path = self.script_dir / config['paths']['pcap_path']
+        self.csv_path = self.script_dir / config['paths']['csv_path']
+        self.json_path = self.script_dir / config['paths']['json_path']
+        self.model_path = self.script_dir / config['paths']['model_path']
+        self.flowmeter_path = self.script_dir / config['paths']['flowmeter_path']
         self.model = self.load_model()
 
 
@@ -32,15 +40,17 @@ class NetworkModel(BaseModel):
                 await asyncio.sleep(0.1)
             
             self.preprocess_input()
-            self.classify()
-            self.log_classification()
+            start_time = time.time()
+            percentage = self.classify()
+            end_time= time.time()
+            self.log_classification(start_time, end_time, percentage)
             await asyncio.sleep(0)
         
     def load_model(self):
         """
         Load the model.
         """
-        model = load(self.script_dir / 'trained_model/network_model.joblib')
+        model = load(self.script_dir / self.model_path)
         return model
 
 
@@ -98,8 +108,8 @@ class NetworkModel(BaseModel):
         #     print(f"Error while merging capture files: {e}")
         #     exit
         ##############################
-        #TODO ABSTRACT THIS TO CONFIG FILE
-        flow_cmd = [self.script_dir / "FlowMeter/pkg/flowmeter", "-ifLiveCapture=false", "-fname=merged_pcap", "-maxNumPackets=40000000", "-ifLocalIPKnown", "false"]
+
+        flow_cmd = [self.script_dir / self.flowmeter_path, "-ifLiveCapture=false", "-fname=merged_pcap", "-maxNumPackets=40000000", "-ifLocalIPKnown", "false"]
 
         try:
             # Run flow_cmd
@@ -120,7 +130,7 @@ class NetworkModel(BaseModel):
             data[feature + "PerTime"] = data[feature] / data["flowDuration"]
         data = data[feature_cols]
 
-        data.to_csv(self.script_dir / "FlowMeter/pkg/flowOutput/merged_pcap_flow_stats", index=False)
+        data.to_csv(self.script_dir / self.csv_path, index=False)
 
 
     def classify(self):
@@ -134,15 +144,26 @@ class NetworkModel(BaseModel):
         target_class = 1 #1 == Benign
         percentage = np.mean(predictions == target_class) * 100
         print(f"Percentage of class {target_class}: {percentage:.2f}%")
-        pass
+        return percentage
+        
 
 
-    def log_classification(self, classification_result):
+    def log_classification(self, start_time, end_time, percentage):
         """
         Log the classification result.
         """
-
-        pass
+        total_time = end_time - start_time
+        #Check if csv exists
+        if not os.path.exists('network_logs.csv'):
+            op = 'w'
+        else:
+            op = 'a'
+        # Write the logging info to the CSV file
+        with open('network_logs.csv', op, newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow([total_time, end_time, percentage])
+        logging.log(logging.INFO, f"Network Module: Total classification time was {total_time}. Percentage of flows classfied as benign was {percentage}")
+        
 
 
 

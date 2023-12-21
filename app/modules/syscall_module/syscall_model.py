@@ -9,6 +9,7 @@ import json
 import yaml
 import time
 import csv
+import os
 
 class SyscallModel(BaseModel):
     module_name = "system_calls"
@@ -176,11 +177,13 @@ class SyscallModel(BaseModel):
         average_intrusion_loss_factor = sum(intrusion_losses) / len(intrusion_losses) if intrusion_losses else 0
 
         # Write the logging info to the CSV file
-        with open('syscall_logs.csv', 'a', newline='') as f:
+        if not os.path.exists('syscall_logs.csv'): op = 'w'
+        else: op = 'a'
+        with open('syscall_logs.csv', op, newline='') as f:
             writer = csv.writer(f)
             writer.writerow([end_time, sequences_per_second, self.batch_size,
                              average_normal_loss_factor, average_intrusion_loss_factor,
                              self.threshold, percentage_intrusions])
             
-        print(f"Syscall Module: {num_sequences} sequences classified in {time_taken} seconds. \
+        logging.log(logging.INFO, f"Syscall Module: {num_sequences} sequences classified in {time_taken} seconds. \
                     ({sequences_per_second} sequences per second)")

@@ -1,12 +1,15 @@
-import asyncio
-import json
-import os
-from dataclasses import asdict, dataclass
-import subprocess
-import nats
 from nats.errors import ConnectionClosedError, NoServersError, TimeoutError
-import shlex
+from dataclasses import asdict, dataclass
+
+import subprocess
+import logging
 import modules
+import asyncio
+import shlex
+import json
+import nats
+import os
+
 
 @dataclass
 class Payload:
@@ -74,4 +77,5 @@ async def main():
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     asyncio.run(main())

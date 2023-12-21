@@ -13,8 +13,9 @@ import os
 
 class SyscallModel(BaseModel):
     module_name = "system_calls"
-    def __init__(self):
+    def __init__(self, alert_callback):
         super().__init__()
+        self.alert_callback = alert_callback
         script_dir = Path(__file__).parent.absolute()
 
         with open(script_dir / 'syscall.conf') as f:
@@ -26,6 +27,7 @@ class SyscallModel(BaseModel):
         
         self.syscall_mapping = {i: i for i in range(config['general']['num_system_calls'])}
         self.sequence_length = self.model.sequence_length
+        self.alert_threshold = config['general']['alert_threshold']
         self.batch_size = config['general']['batch_size']
         self.threshold = config['general']['threshold']
         self.read_size = config['general']['read_size']
@@ -53,7 +55,7 @@ class SyscallModel(BaseModel):
             end_time = time.time()
 
             # Log the classification results
-            self.log_classification(losses, classifications, start_time, end_time)
+            await self.log_classification(losses, classifications, start_time, end_time)
 
             await asyncio.sleep(0)
 
@@ -154,7 +156,7 @@ class SyscallModel(BaseModel):
 
         return classifications, losses
 
-    def log_classification(self, losses: list, classifications: list, start_time: float, end_time: float):
+    async def log_classification(self, losses: list, classifications: list, start_time: float, end_time: float):
         """
         Compute logging info.
 
@@ -186,4 +188,20 @@ class SyscallModel(BaseModel):
                              self.threshold, percentage_intrusions])
             
         logging.log(logging.INFO, f"Syscall Module: {num_sequences} sequences classified in {time_taken} seconds. \
-                    ({sequences_per_second} sequences per second)")
+                    ({sequences_per_second} sequences per second), {percentage_intrusions}% intrusions on batch.")
+        
+        # Alert Compute-node if intrusion is detected
+        if percentage_intrusions > self.alert_threshold:
+            self.alert_intrusion(end_time, average_intrusion_loss_factor, percentage_intrusions)
+
+    def alert_intrusion(self, end_time: float, average_intrusion_loss_factor: float, percentage_intrusions: float):
+        """
+        Alert Compute-node about intrusion.
+        """
+        data = {
+            "timestamp": end_time,
+            "average_intrusion_loss_factor": average_intrusion_loss_factor,
+            "percentage_intrusions": percentage_intrusions,
+        }
+        self.alert_callback(self.module_name, "Possible intrusion detected", data)
+        

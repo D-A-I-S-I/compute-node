@@ -32,7 +32,7 @@ class Compute:
     def load_modules(self):
         for module in modules.__all__:
             try:
-                c = getattr(modules, module)()
+                c = getattr(modules, module)(self.handle_alert)
                 if hasattr(c, 'module_name'):
                     self.modules[c.module_name] = c
                 else:
@@ -71,11 +71,16 @@ class Compute:
         await self.receive()
         await self.nc.drain()
 
+    def handle_alert(self, module_name, alert, data=None):
+        logging.log(logging.CRITICAL, f"Alert from {module_name}: {alert}")
+        if data: print(f"Alert data: {data=}")
+
 async def main():
     compute = await Compute.create()
     await compute.run()
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    log_level = os.getenv('LOG_LEVEL', 'WARNING').upper() # LOG_LEVEL=INFO make ... for more verbose logging.
+    logging.basicConfig(level=log_level)
     asyncio.run(main())

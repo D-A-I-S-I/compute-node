@@ -53,3 +53,10 @@ class BaseModel(ABC):
         Read data from the file.
         """
         pass
+
+    @abstractmethod
+    def alert_intrusion(self):
+        """
+        Alert intrusion.
+        """
+        pass

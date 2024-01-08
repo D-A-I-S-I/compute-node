@@ -10,10 +10,13 @@ import yaml
 import time
 import csv
 import os
+import matplotlib.pyplot as plt
+from collections import deque
+import random
 
 class SyscallModel(BaseModel):
     module_name = "system_calls"
-    def __init__(self, alert_callback):
+    def __init__(self, alert_callback, visualization=0):
         super().__init__()
         self.alert_callback = alert_callback
         script_dir = Path(__file__).parent.absolute()
@@ -33,6 +36,12 @@ class SyscallModel(BaseModel):
         self.read_size = config['general']['read_size']
         self.last_read_position = 0
         self.buffer = []
+        self.visualization = visualization
+
+        if visualization:
+            plt.ion()  # Interaktiven Modus aktivieren
+            self.fig, self.ax = plt.subplots()
+            self.data_buffer = deque(maxlen=50)
 
     async def run(self):
         """
@@ -55,7 +64,7 @@ class SyscallModel(BaseModel):
             end_time = time.time()
 
             # Log the classification results
-            await self.log_classification(losses, classifications, start_time, end_time)
+            self.log_classification(losses, classifications, start_time, end_time)
 
             await asyncio.sleep(0)
 
@@ -156,7 +165,7 @@ class SyscallModel(BaseModel):
 
         return classifications, losses
 
-    async def log_classification(self, losses: list, classifications: list, start_time: float, end_time: float):
+    def log_classification(self, losses: list, classifications: list, start_time: float, end_time: float):
         """
         Compute logging info.
 
@@ -177,11 +186,11 @@ class SyscallModel(BaseModel):
 
         average_normal_loss_factor = sum(normal_losses) / len(normal_losses) if normal_losses else 0
         average_intrusion_loss_factor = sum(intrusion_losses) / len(intrusion_losses) if intrusion_losses else 0
-
+      
         # Write the logging info to the CSV file
-        if not os.path.exists('syscall_logs.csv'): op = 'w'
-        else: op = 'a'
-        with open('syscall_logs.csv', op, newline='') as f:
+        script_dir = Path(__file__).parent.absolute()
+        csv_path = script_dir / 'syscall_logs.csv'
+        with open(csv_path, "a", newline='') as f:
             writer = csv.writer(f)
             writer.writerow([end_time, sequences_per_second, self.batch_size,
                              average_normal_loss_factor, average_intrusion_loss_factor,
@@ -189,10 +198,24 @@ class SyscallModel(BaseModel):
             
         logging.log(logging.INFO, f"Syscall Module: {num_sequences} sequences classified in {time_taken} seconds. \
                     ({sequences_per_second} sequences per second), {percentage_intrusions}% intrusions on batch.")
-        
+        if self.visualization:
+            self.visualize(average_intrusion_loss_factor)
+
         # Alert Compute-node if intrusion is detected
         if percentage_intrusions > self.alert_threshold:
             self.alert_intrusion(end_time, average_intrusion_loss_factor, percentage_intrusions)
+
+    def visualize(self, average_intrusion_loss_factor):
+        print("www")
+        self.data_buffer.append(average_intrusion_loss_factor)
+        self.ax.clear()
+        self.ax.plot(self.data_buffer)
+        self.ax.set_title('intrusion_loss')
+        self.ax.set_xlabel('time')
+        self.ax.set_ylabel('avg loss')
+        plt.savefig(f"{Path(__file__).parent.absolute()}/syscall_logs_avg_intrusion.png")
+        plt.pause(0.1)
+
 
     def alert_intrusion(self, end_time: float, average_intrusion_loss_factor: float, percentage_intrusions: float):
         """

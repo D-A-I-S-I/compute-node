@@ -1,5 +1,3 @@
-#TODO How/Where to loop until buffer is full
-
 from ..base_model import BaseModel
 import subprocess
 from joblib import load
@@ -25,10 +23,11 @@ class NetworkModel(BaseModel):
             config = yaml.load(f, Loader=yaml.SafeLoader)
         self.pcap_path = self.script_dir / config['paths']['pcap_path']
         self.csv_path = self.script_dir / config['paths']['csv_path']
-        self.json_path = self.script_dir / config['paths']['json_path']
+        self.tmp_path = self.script_dir / config['paths']['tmp_path']
         self.model_path = self.script_dir / config['paths']['model_path']
         self.flowmeter_path = self.script_dir / config['paths']['flowmeter_path']
         self.model = self.load_model()
+        self.buffer_size = 4
 
 
     async def run(self):
@@ -37,6 +36,7 @@ class NetworkModel(BaseModel):
             filledBuffer = False
             while not filledBuffer:
                 filledBuffer = self.read_from_buffer()
+                print('')
                 await asyncio.sleep(0.1)
             
             self.preprocess_input()
@@ -65,10 +65,10 @@ class NetworkModel(BaseModel):
         """
         Append receieved to buffer and check size of buffer.
         """
-        if len(self.buffer) < 150:
+        if len(self.buffer) < 4:
             return False
         
-        elif len(self.buffer) > 150:
+        elif len(self.buffer) > 4:
             self.buffer.pop()
             return True
         
@@ -80,34 +80,25 @@ class NetworkModel(BaseModel):
         """
         Preprocess input data before feeding it to the model.
         """
-        #Merge json files and convert to pcap
-        merged_json = {}
-        for i in range(150):
-            json_file = json.load(self.buffer[i])
-            merged_json.update(json_file)
+        #Save pcap files in folder
+        for i in range(len(self.buffer_size)):
+            pcap_file = open(i + '.pcap', 'w')
+            pcap_file.write(self.buffer[i])
+            pcap_file.close()
 
-        json.dump(merged_json, self.json_path)
-        
-        jsonToPcap_cmd = ["python3", self.script_dir / "json2pcap.py", "-i", self.json_path, "-o", self.pcap_path]
+        #file_names = [f for f in os.listdir(self.tmp_path) if os.path.isfile(os.path.join(self.tmp_path, f))]
 
+        #Merge pcaps
+        mergecap_cmd = ["mergecap", "-w", self.pcap_path, self.tmp_path + '/0.pcap', self.tmp_path +'/1.pcap', self.tmp_path +'/2.pcap', self.tmp_path + '/3.pcap'] 
         try:
-            subprocess.run(jsonToPcap_cmd)
+            # Run mergecap_cmd
+            subprocess.run(mergecap_cmd, check=True)
+            print(f"Merged capture files into {self.pcap_path}")
         
-        except:
-            print(f"Error while converting json to pcap: {e}")
+        except subprocess.CalledProcessError as e:
+            print(f"Error while merging capture files: {e}")
             exit
 
-        ######DO NOT USE THIS########
-        # mergecap_cmd = ["mergecap", "-w", self.pcap_path] + self.buffer[:150]
-        # try:
-        #     # Run mergecap_cmd
-        #     subprocess.run(mergecap_cmd, check=True)
-        #     print(f"Merged capture files into {self.pcap_path}")
-        
-        # except subprocess.CalledProcessError as e:
-        #     print(f"Error while merging capture files: {e}")
-        #     exit
-        ##############################
 
         flow_cmd = [self.script_dir / self.flowmeter_path, "-ifLiveCapture=false", "-fname=merged_pcap", "-maxNumPackets=40000000", "-ifLocalIPKnown", "false"]
 

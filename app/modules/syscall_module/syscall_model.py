@@ -9,11 +9,13 @@ import json
 import yaml
 import time
 import csv
+import os
 
 class SyscallModel(BaseModel):
     module_name = "system_calls"
-    def __init__(self):
+    def __init__(self, alert_callback):
         super().__init__()
+        self.alert_callback = alert_callback
         script_dir = Path(__file__).parent.absolute()
 
         with open(script_dir / 'syscall.conf') as f:
@@ -25,6 +27,7 @@ class SyscallModel(BaseModel):
         
         self.syscall_mapping = {i: i for i in range(config['general']['num_system_calls'])}
         self.sequence_length = self.model.sequence_length
+        self.alert_threshold = config['general']['alert_threshold']
         self.batch_size = config['general']['batch_size']
         self.threshold = config['general']['threshold']
         self.read_size = config['general']['read_size']
@@ -52,7 +55,7 @@ class SyscallModel(BaseModel):
             end_time = time.time()
 
             # Log the classification results
-            self.log_classification(losses, classifications, start_time, end_time)
+            await self.log_classification(losses, classifications, start_time, end_time)
 
             await asyncio.sleep(0)
 
@@ -153,7 +156,7 @@ class SyscallModel(BaseModel):
 
         return classifications, losses
 
-    def log_classification(self, losses: list, classifications: list, start_time: float, end_time: float):
+    async def log_classification(self, losses: list, classifications: list, start_time: float, end_time: float):
         """
         Compute logging info.
 
@@ -176,11 +179,29 @@ class SyscallModel(BaseModel):
         average_intrusion_loss_factor = sum(intrusion_losses) / len(intrusion_losses) if intrusion_losses else 0
 
         # Write the logging info to the CSV file
-        with open('syscall_logs.csv', 'a', newline='') as f:
+        if not os.path.exists('syscall_logs.csv'): op = 'w'
+        else: op = 'a'
+        with open('syscall_logs.csv', op, newline='') as f:
             writer = csv.writer(f)
             writer.writerow([end_time, sequences_per_second, self.batch_size,
                              average_normal_loss_factor, average_intrusion_loss_factor,
                              self.threshold, percentage_intrusions])
             
-        print(f"Syscall Module: {num_sequences} sequences classified in {time_taken} seconds. \
-                    ({sequences_per_second} sequences per second)")
+        logging.log(logging.INFO, f"Syscall Module: {num_sequences} sequences classified in {time_taken} seconds. \
+                    ({sequences_per_second} sequences per second), {percentage_intrusions}% intrusions on batch.")
+        
+        # Alert Compute-node if intrusion is detected
+        if percentage_intrusions > self.alert_threshold:
+            self.alert_intrusion(end_time, average_intrusion_loss_factor, percentage_intrusions)
+
+    def alert_intrusion(self, end_time: float, average_intrusion_loss_factor: float, percentage_intrusions: float):
+        """
+        Alert Compute-node about intrusion.
+        """
+        data = {
+            "timestamp": end_time,
+            "average_intrusion_loss_factor": average_intrusion_loss_factor,
+            "percentage_intrusions": percentage_intrusions,
+        }
+        self.alert_callback(self.module_name, "Possible intrusion detected", data)
+        

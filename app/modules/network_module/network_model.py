@@ -1,21 +1,23 @@
 from ..base_model import BaseModel
-import subprocess
+from pathlib import Path
 from joblib import load
+
 import pandas as pd
 import numpy as np
-import json
+import subprocess
 import asyncio
-from pathlib import Path
+import logging
+import yaml
+import json
 import time
 import csv
 import os
-import logging
-import yaml
 
 class NetworkModel(BaseModel):
     module_name = "network_traffic"
-    def __init__(self):
+    def __init__(self, alert_callback):
         super().__init__()
+        self.alert_callback = alert_callback
         self.buffer = []
         self.script_dir = Path(__file__).parent.absolute()
 
@@ -26,6 +28,7 @@ class NetworkModel(BaseModel):
         self.tmp_path = self.script_dir / config['paths']['tmp_path']
         self.model_path = self.script_dir / config['paths']['model_path']
         self.flowmeter_path = self.script_dir / config['paths']['flowmeter_path']
+        self.alert_threshold = config['general']['alert_threshold']
         self.model = self.load_model()
         self.buffer_size = 4
 
@@ -41,9 +44,9 @@ class NetworkModel(BaseModel):
             
             self.preprocess_input()
             start_time = time.time()
-            percentage = self.classify()
+            percent_malicious = self.classify()
             end_time= time.time()
-            self.log_classification(start_time, end_time, percentage)
+            self.log_classification(start_time, end_time, percent_malicious)
             await asyncio.sleep(0)
         
     def load_model(self):
@@ -71,9 +74,8 @@ class NetworkModel(BaseModel):
         elif len(self.buffer) > 4:
             self.buffer.pop()
             return True
-        
-        else:
-            return True
+    
+        return True
 
 
     def preprocess_input(self):
@@ -103,13 +105,12 @@ class NetworkModel(BaseModel):
         flow_cmd = [self.script_dir / self.flowmeter_path, "-ifLiveCapture=false", "-fname=merged_pcap", "-maxNumPackets=40000000", "-ifLocalIPKnown", "false"]
 
         try:
-            # Run flow_cmd
             subprocess.run(flow_cmd, check=True)
             print(f"Transformed PCAP into CSV: {self.csv_path}")
         
         except subprocess.CalledProcessError as e:
             print(f"Error while converting to flow data: {e}")
-            exit
+            exit(1)
         
         #Pre-process CSV file
         columns = json.load(self.script_dir / 'data_features.json')
@@ -131,31 +132,40 @@ class NetworkModel(BaseModel):
         data = pd.read_csv(self.csv_path, delimiter=",")
         predictions = self.model.predict(data)
 
+        target_class = 0
+        target_name = {0: "Malicious", 1: "Benign"}
+        percent_malicious = np.mean(predictions == target_class) * 100
+        logging.log(logging.INFO, f"Percent of class {target_name[target_class]}: {percent_malicious:.2f}%")
 
-        target_class = 1 #1 == Benign
-        percentage = np.mean(predictions == target_class) * 100
-        print(f"Percentage of class {target_class}: {percentage:.2f}%")
-        return percentage
+        return percent_malicious
         
 
-
-    def log_classification(self, start_time, end_time, percentage):
+    def log_classification(self, start_time, end_time, percent_malicious):
         """
         Log the classification result.
         """
         total_time = end_time - start_time
+
         #Check if csv exists
-        if not os.path.exists('network_logs.csv'):
-            op = 'w'
-        else:
-            op = 'a'
+        if not os.path.exists('network_logs.csv'): op = 'w'
+        else: op = 'a'
+
         # Write the logging info to the CSV file
         with open('network_logs.csv', op, newline='') as f:
             writer = csv.writer(f)
-            writer.writerow([total_time, end_time, percentage])
-        logging.log(logging.INFO, f"Network Module: Total classification time was {total_time}. Percentage of flows classfied as benign was {percentage}")
+            writer.writerow([total_time, end_time, percent_malicious])
+        logging.log(logging.INFO, f"Network Module: Total classification time was {total_time}. Percentage of flows classfied as malicious was {percent_malicious}")
         
-
-
-
-
+        # Alert Compute-node if intrusion is detected
+        if percent_malicious > self.alert_threshold:
+            self.alert_intrusion(end_time, percent_malicious)
+        
+    def alert_intrusion(self, end_time, percent_malicious):
+        """
+        Alert Compute-node about intrusion.
+        """
+        data = {
+            "timestamp": end_time,
+            "percent_malicious": percent_malicious
+        }
+        self.alert_callback(self.module_name, "Intrusion Detected", data)

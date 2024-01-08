@@ -1,4 +1,4 @@
-.PHONY: clean venv
+.PHONY: clean broker run docker up down logs watch
 
 venv: venv/touchfile
 	docker compose up -d broker
@@ -24,3 +24,18 @@ watch:
 clean:
 	rm -r venv
 	docker compose down --remove-orphans
+
+FLOWMETER_DIR = ./app/modules/network_module/FlowMeter
+define clone_flowmeter
+	@if [ ! -d $(FLOWMETER_DIR) ]; then \
+		git clone $(1) $(FLOWMETER_DIR); \
+	else \
+		echo "FlowMeter already installed"; \
+	fi
+endef
+
+flow-install:
+	$(call clone_flowmeter,https://github.com/deepfence/FlowMeter.git)
+
+flow-install-ssh:
+	$(call clone_flowmeter,git@github.com:deepfence/FlowMeter.git)

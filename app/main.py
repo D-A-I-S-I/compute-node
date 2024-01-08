@@ -1,12 +1,16 @@
-import asyncio
-import json
-import os
-from dataclasses import asdict, dataclass
-import subprocess
-import nats
 from nats.errors import ConnectionClosedError, NoServersError, TimeoutError
-import shlex
+from dataclasses import asdict, dataclass
+
+import subprocess
+import logging
 import modules
+import asyncio
+import shlex
+import json
+import nats
+import os
+import pickle
+
 
 @dataclass
 class Payload:
@@ -29,7 +33,7 @@ class Compute:
     def load_modules(self):
         for module in modules.__all__:
             try:
-                c = getattr(modules, module)()
+                c = getattr(modules, module)(self.handle_alert)
                 if hasattr(c, 'module_name'):
                     self.modules[c.module_name] = c
                 else:
@@ -51,16 +55,19 @@ class Compute:
         while (True):
             async for message in sub.messages:
                 try:
-                    payload = Payload(**json.loads(message.data))
-                    print(
-                        f"received valid JSON payload: {payload.id=} {payload.module=} {payload.data=}"
-                    )
+                    module = message.headers['module_name']
+                    data = pickle.loads(message.data)
+                    logging.log(logging.INFO, f'Received message: {module}: {data}')
                     try:
-                        self.modules[payload.module].write_to_buffer(payload.data)
+                        self.modules[module].write_to_buffer(data)
                     except KeyError:
-                        print(f"Module {payload.module} not found")
+                        logging.log(logging.ERROR, f"Module {module} not found")
+                    except Exception as e:
+                        logging.log(logging.ERROR, f"Error writing to module buffer: {e}")
                 except json.decoder.JSONDecodeError:
-                    print(f"received invalid JSON payload: {message.data=}")
+                    logging.log(logging.ERROR, f"received invalid JSON payload: {message.data=}")
+                except Exception as e:
+                    logging.log(logging.ERROR, f"Error receiving message: {e}")
 
     async def run(self):
         print("Running")
@@ -68,10 +75,16 @@ class Compute:
         await self.receive()
         await self.nc.drain()
 
+    def handle_alert(self, module_name, alert, data=None):
+        logging.log(logging.CRITICAL, f"Alert from {module_name}: {alert}")
+        if data: print(f"Alert data: {data=}")
+
 async def main():
     compute = await Compute.create()
     await compute.run()
 
 
 if __name__ == "__main__":
+    log_level = os.getenv('LOG_LEVEL', 'INFO').upper() # LOG_LEVEL=INFO make ... for more verbose logging.
+    logging.basicConfig(level=log_level)
     asyncio.run(main())

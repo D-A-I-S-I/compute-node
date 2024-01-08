@@ -30,7 +30,7 @@ class NetworkModel(BaseModel):
         self.flowmeter_path = self.script_dir / config['paths']['flowmeter_path']
         self.alert_threshold = config['general']['alert_threshold']
         self.model = self.load_model()
-        self.buffer_size = 100
+        self.buffer_size = 15
 
 
     async def run(self):
@@ -39,7 +39,6 @@ class NetworkModel(BaseModel):
             filledBuffer = False
             while not filledBuffer:
                 filledBuffer = self.read_from_buffer()
-                print('')
                 await asyncio.sleep(0.1)
             
             self.preprocess_input()
@@ -84,10 +83,11 @@ class NetworkModel(BaseModel):
         """
         #Save pcap files in folder
         file_names = []
-        for i in range(len(self.buffer_size)):
-            file_name = i + '.pcap'
-            pcap_file = open(file_name, 'w')
-            file_names.append('tmp/' + file_name)
+        for i in range(self.buffer_size):
+            file_name = self.tmp_path / (str(i) + '.pcap')
+            print(file_name)
+            pcap_file = open(file_name, 'wb')
+            file_names.append(file_name)
             pcap_file.write(self.buffer[i])
             pcap_file.close()
 
@@ -106,7 +106,7 @@ class NetworkModel(BaseModel):
         flow_cmd = [self.script_dir / self.flowmeter_path, "-ifLiveCapture=false", "-fname=merged_pcap", "-maxNumPackets=40000000", "-ifLocalIPKnown", "false"]
 
         try:
-            subprocess.run(flow_cmd, check=True)
+            subprocess.run(flow_cmd, check=True, cwd=self.flowmeter_path.parent)
             print(f"Transformed PCAP into CSV: {self.csv_path}")
         
         except subprocess.CalledProcessError as e:
@@ -114,7 +114,8 @@ class NetworkModel(BaseModel):
             exit(1)
         
         #Pre-process CSV file
-        columns = json.load(self.script_dir / 'data_features.json')
+        with open(self.script_dir / 'data_features.json') as f:
+            columns = json.load(f)
         colsPerTime = columns['colsPerTime']
         feature_cols = columns['feature_cols']
         data = pd.read_csv(self.csv_path, delimiter=",")
@@ -130,11 +131,12 @@ class NetworkModel(BaseModel):
         """
         Perform classification on the preprocessed data.
         """
+
         data = pd.read_csv(self.csv_path, delimiter=",")
         predictions = self.model.predict(data)
 
         target_class = 0
-        target_name = {0: "Malicious", 1: "Benign"}
+        target_name = {1: "Malicious", 0: "Benign"}
         percent_malicious = np.mean(predictions == target_class) * 100
         logging.log(logging.INFO, f"Percent of class {target_name[target_class]}: {percent_malicious:.2f}%")
 

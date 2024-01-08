@@ -9,6 +9,7 @@ import shlex
 import json
 import nats
 import os
+import pickle
 
 
 @dataclass
@@ -54,16 +55,19 @@ class Compute:
         while (True):
             async for message in sub.messages:
                 try:
-                    payload = Payload(**json.loads(message.data))
-                    print(
-                        f"received valid JSON payload: {payload.id=} {payload.module=} {payload.data=}"
-                    )
+                    module = message.headers['module_name']
+                    data = pickle.loads(message.data)
+                    logging.log(logging.INFO, f'Received message: {module}: {data}')
                     try:
-                        self.modules[payload.module].write_to_buffer(payload.data)
+                        self.modules[module].write_to_buffer(data)
                     except KeyError:
-                        print(f"Module {payload.module} not found")
+                        logging.log(logging.ERROR, f"Module {module} not found")
+                    except Exception as e:
+                        logging.log(logging.ERROR, f"Error writing to module buffer: {e}")
                 except json.decoder.JSONDecodeError:
-                    print(f"received invalid JSON payload: {message.data=}")
+                    logging.log(logging.ERROR, f"received invalid JSON payload: {message.data=}")
+                except Exception as e:
+                    logging.log(logging.ERROR, f"Error receiving message: {e}")
 
     async def run(self):
         print("Running")
@@ -81,6 +85,6 @@ async def main():
 
 
 if __name__ == "__main__":
-    log_level = os.getenv('LOG_LEVEL', 'WARNING').upper() # LOG_LEVEL=INFO make ... for more verbose logging.
+    log_level = os.getenv('LOG_LEVEL', 'INFO').upper() # LOG_LEVEL=INFO make ... for more verbose logging.
     logging.basicConfig(level=log_level)
     asyncio.run(main())

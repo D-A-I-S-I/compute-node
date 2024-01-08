@@ -30,7 +30,7 @@ class NetworkModel(BaseModel):
         self.flowmeter_path = self.script_dir / config['paths']['flowmeter_path']
         self.alert_threshold = config['general']['alert_threshold']
         self.model = self.load_model()
-        self.buffer_size = 4
+        self.buffer_size = 100
 
 
     async def run(self):
@@ -68,10 +68,10 @@ class NetworkModel(BaseModel):
         """
         Append receieved to buffer and check size of buffer.
         """
-        if len(self.buffer) < 4:
+        if len(self.buffer) < self.buffer_size:
             return False
         
-        elif len(self.buffer) > 4:
+        elif len(self.buffer) > self.buffer_size:
             self.buffer.pop()
             return True
     
@@ -83,15 +83,16 @@ class NetworkModel(BaseModel):
         Preprocess input data before feeding it to the model.
         """
         #Save pcap files in folder
+        file_names = []
         for i in range(len(self.buffer_size)):
-            pcap_file = open(i + '.pcap', 'w')
+            file_name = i + '.pcap'
+            pcap_file = open(file_name, 'w')
+            file_names.append('tmp/' + file_name)
             pcap_file.write(self.buffer[i])
             pcap_file.close()
 
-        #file_names = [f for f in os.listdir(self.tmp_path) if os.path.isfile(os.path.join(self.tmp_path, f))]
-
         #Merge pcaps
-        mergecap_cmd = ["mergecap", "-w", self.pcap_path, self.tmp_path + '/0.pcap', self.tmp_path +'/1.pcap', self.tmp_path +'/2.pcap', self.tmp_path + '/3.pcap'] 
+        mergecap_cmd = ["mergecap", "-w", self.pcap_path] + file_names 
         try:
             # Run mergecap_cmd
             subprocess.run(mergecap_cmd, check=True)

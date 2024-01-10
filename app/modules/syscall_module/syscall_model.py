@@ -9,13 +9,14 @@ import json
 import yaml
 import time
 import csv
-import os
 import matplotlib.pyplot as plt
 from collections import deque
-import random
 
 class SyscallModel(BaseModel):
-    module_name = "system_calls"
+    @property
+    def module_name(self):
+        return "system_calls"
+    
     def __init__(self, alert_callback, visualization=0):
         super().__init__()
         self.alert_callback = alert_callback

@@ -14,7 +14,10 @@ import csv
 import os
 
 class NetworkModel(BaseModel):
-    module_name = "network_traffic"
+    @property
+    def module_name(self):
+        return "network_traffic"
+    
     def __init__(self, alert_callback):
         super().__init__()
         self.alert_callback = alert_callback

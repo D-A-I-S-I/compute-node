@@ -1,6 +1,15 @@
 from abc import ABC, abstractmethod
 
 class BaseModel(ABC):
+    @property
+    @abstractmethod
+    def module_name(self):
+        """
+        Name of the module. 
+        (Used for env variable to start module)
+        """
+        pass
+
     def __init__(self):
         pass
 

@@ -22,7 +22,14 @@ AND
 - [tshark](https://www.wireshark.org/docs/)
 
 ## Installation
-Initializes VM, installs python reqs, starts NATS broker in Docker, then runs the main.py in compute node. dependencies are docker and docker Compose
+In order to do the following:
+
+1. Initialize VM
+2. Install python requirements
+3. Start NATS broker in Docker
+4. Run main.py
+
+All  you gotta do is:
 ```python
 sudo make
 ```
@@ -49,4 +56,4 @@ New modules can created by inheriting from the `BaseModel` class. <!---The modul
 
 ## Module Configuration
 
-Each module has a corresponding config file where one can edit the paths for the files/programs needed for that specific module. Different variables (such as alert_threshold) can also be changed`
+Each module has a corresponding config file (`<module-name>.conf`) where you can edit the paths for the files/programs needed for that specific module, and set constants such as alert_threshold.

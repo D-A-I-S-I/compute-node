@@ -33,7 +33,7 @@ class NetworkModel(BaseModel):
         self.flowmeter_path = self.script_dir / config['paths']['flowmeter_path']
         self.alert_threshold = config['general']['alert_threshold']
         self.model = self.load_model()
-        self.buffer_size = 15
+        self.buffer_size = 110
 
 
     async def run(self):
@@ -88,7 +88,6 @@ class NetworkModel(BaseModel):
         file_names = []
         for i in range(self.buffer_size):
             file_name = self.tmp_path / (str(i) + '.pcap')
-            print(file_name)
             pcap_file = open(file_name, 'wb')
             file_names.append(file_name)
             pcap_file.write(self.buffer[i])

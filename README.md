@@ -1,6 +1,6 @@
 # Compute Node
 
-Compute node receives data from [Collector node(s)](https://github.com/D-A-I-S-I/compute-node) and runs chosen modules for different ml-models which classify data as malicious or benign.
+Compute node receives data from [Collector node(s)](https://github.com/D-A-I-S-I/collector-node) and runs chosen modules for different ml-models which classify data as malicious or benign.
 
 ## Dependencies
 
